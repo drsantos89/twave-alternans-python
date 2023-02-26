@@ -2,7 +2,6 @@
 import logging
 from typing import Any
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pydantic
 import wfdb
@@ -45,7 +44,9 @@ class TWAExtractor(pydantic.BaseModel):
         self._correct_baseline()
         logging.info("replacing low correlation beats ...")
         self._replace_low_correlation_beats()
-        logging.info(f"abnormal beat percentage :, np.sum(b, axis=0)/len(qrs)*100")
+        logging.info(
+            f"abnormal beat percentage : {np.sum(self.b, axis=0)/len(self.qrs)*100}"
+        )
         logging.info("building t wave vector ...")
         self._build_t_wave_vector()
         logging.info("calculating K-score ...")
@@ -81,6 +82,6 @@ class TWAExtractor(pydantic.BaseModel):
 
     def _correct_baseline(self) -> None:
         """Correct baseline in ECG signal."""
-        signal_corrected = wfdb.ecg.correct_baseline_wander(
+        self.signal_corrected = wfdb.ecg.correct_baseline_wander(
             signal=self.signal_filt, sampling_rate=self.fs, method="polynomial", order=3
         )
