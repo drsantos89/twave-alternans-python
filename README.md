@@ -1,5 +1,6 @@
 # T-wave Alternans Estimator
-![Test Status](https://github.com/drsantos89/twave-alternans-python/actions/workflows/ci.yaml/badge.svg?branch=main)
+![CI](https://github.com/drsantos89/twave-alternans-python/actions/workflows/ci.yaml/badge.svg?branch=main)
+[![PyPI version](https://badge.fury.io/py/twaextractor.svg)](https://pypi.org/project/twaextractor/)
 
 ## Spectral Analysis of T-wave Alternans (Kscore)
 
