@@ -1,19 +1,21 @@
-"""Setup file for <templateds>."""
+"""Setup file for TWAE."""
 from setuptools import find_packages, setup
 
 VERSION = "0.1.0"
 
-DESCRIPTION = "Extract T-wave alternans from ECG signals."
+DESCRIPTION = (
+    "Extract T-wave alternans from ECG signals using the spectral method (K-score)."
+)
 
 setup(
-    name="twa-extractor",
+    name="twaextractor",
     version=VERSION,
     description=DESCRIPTION,
     author="Diogo Santos",
     author_email="drsantos989@gmail.com",
     packages=find_packages("src"),
     package_dir={"": "src"},
-    install_requires=["scikit-learn", "wfdb", "matplotlib"],
+    install_requires=["scikit-learn", "wfdb", "matplotlib", "scipy"],
     extras_require={
         "dev": [
             "isort",
