@@ -25,6 +25,11 @@ class TWAExtractor(pydantic.BaseModel):
     fs: int | None = None
     num_signals: int | None = None
 
+    class Config:
+        """Pydantic config class."""
+
+        arbitrary_types_allowed = True
+
     def extract(self) -> None:
         """Extract TWA from ECG signal.
 

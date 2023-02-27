@@ -15,7 +15,14 @@ setup(
     author_email="drsantos989@gmail.com",
     packages=find_packages("src"),
     package_dir={"": "src"},
-    install_requires=["scikit-learn", "wfdb", "matplotlib", "scipy"],
+    install_requires=[
+        "scikit-learn",
+        "wfdb",
+        "matplotlib",
+        "scipy",
+        "numpy",
+        "pydantic",
+    ],
     extras_require={
         "dev": [
             "isort",
