@@ -16,9 +16,9 @@ jobs:
       with:
         python-version: "3.10"
     - name: Pre-commit
+      env:
+        SKIP: no-commit-to-branch
       uses: pre-commit/action@v3.0.0
-      with:
-        extra_args: SKIP=no-commit-to-branch
 
   pytest:
     runs-on: ubuntu-latest
