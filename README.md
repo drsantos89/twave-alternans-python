@@ -11,4 +11,3 @@ The Kscore method relies on point-by-point spectral analysis of the T-wave magni
 Where, `P` corresponded to the accumulated amplitude of the power spectrum, usually at a `f=0.5Hz`. `P_{N}` and `\sigma_{P_{N}}` corresponds respectively to the mean and standard deviation of the power spectrum at the noise band, usually set at `f=[0.43:0.49]Hz`. The Kscore measures the statistical significance of the alternans in relation to the noise levels while KTWAM is a direct measure of the TWA magnitude. A visual representation of the algorithm is shown in the figure below.
 
 ![image](https://user-images.githubusercontent.com/9551412/135169912-7b55fe98-3615-4ede-b6b4-8a1ff4684fe7.png)
-
