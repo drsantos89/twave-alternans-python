@@ -34,6 +34,8 @@ class TWAExtractor(pydantic.BaseModel):
     beat_median_odd: np.ndarray[Any, Any] | None = None
     beat_median_even: np.ndarray[Any, Any] | None = None
     beat_corrected_bool: np.ndarray[Any, Any] | None = None
+    t_wave_vector: np.ndarray[Any, Any] | None = None
+    k_score: np.ndarray[Any, Any] | None = None
 
     class Config:
         """Pydantic config class."""
@@ -125,26 +127,46 @@ class TWAExtractor(pydantic.BaseModel):
 
     def _calc_beat_medians(self) -> None:
         """Calculate beat medians from beat matrix."""
-        self.beat_median = np.median(self.beat_matrix_corrected, axis=0)
-        self.beat_median_odd = self.beat_median[1::2]
-        self.beat_median_even = self.beat_median[0::2]
+        if not isinstance(self.beat_matrix_corrected, np.ndarray):
+            raise TypeError("beat_matrix_corrected must be a numpy array")
+
+        self.beat_median = np.median(self.beat_matrix_corrected, axis=1)
+        self.beat_median_odd = np.median(self.beat_matrix_corrected[:, 1::2, :], axis=1)
+        self.beat_median_even = np.median(
+            self.beat_matrix_corrected[:, 0::2, :], axis=1
+        )
 
     def _replace_low_correlation_beats(self) -> None:
         """Replace low correlation beats in ECG signal."""
         if not isinstance(self.qrs, np.ndarray):
             raise TypeError("qrs must be a numpy array")
+        if not isinstance(self.n_sig, int):
+            raise TypeError("n_sig must be an integer")
         if not isinstance(self.beat_matrix_corrected, np.ndarray):
             raise TypeError("beat_matrix_corrected must be a numpy array")
+        if not isinstance(self.beat_median_odd, np.ndarray):
+            raise TypeError("beat_median_odd must be a numpy array")
+        if not isinstance(self.beat_median_even, np.ndarray):
+            raise TypeError("beat_median_even must be a numpy array")
 
-        self.beat_corrected_bool = np.zeros(len(self.qrs))
-        for i, beat in self.beat_matrix_corrected[1::2]:
-            if np.corrcoef(beat, self.beat_median_odd)[0, 1] < 0.9:
-                self.beat_corrected_bool[i] = 1
-                self.beat_matrix_corrected[i, :] = self.beat_median_odd
-        for i, beat in self.beat_matrix_corrected[0::2]:
-            if np.corrcoef(beat, self.beat_median_even)[0, 1] < 0.9:
-                self.beat_corrected_bool[i] = 1
-                self.beat_matrix_corrected[i, :] = self.beat_median_even
+        # placeholder for beat replacement boolean
+        self.beat_corrected_bool = np.zeros((self.n_sig, len(self.qrs)))
+
+        # replace odd beats with low correlation
+        for i in range(1, len(self.qrs) - 1, 2):
+            beat = self.beat_matrix_corrected[:, i, :]
+            for c in range(self.n_sig):
+                if np.corrcoef(beat[c, :], self.beat_median_odd[c, :])[0, 1] < 0.9:
+                    self.beat_corrected_bool[c, i] = 1
+                    self.beat_matrix_corrected[c, i, :] = self.beat_median_odd[c, :]
+
+        # replace even beats with low correlation
+        for i in range(0, len(self.qrs) - 1, 2):
+            beat = self.beat_matrix_corrected[:, i, :]
+            for c in range(self.n_sig):
+                if np.corrcoef(beat[c, :], self.beat_median_even[c, :])[0, 1] < 0.9:
+                    self.beat_corrected_bool[c, i] = 1
+                    self.beat_matrix_corrected[c, i, :] = self.beat_median_even[c, :]
 
     def _build_t_wave_vector(self) -> None:
         """Build T-wave vector from ECG signal."""
@@ -155,16 +177,24 @@ class TWAExtractor(pydantic.BaseModel):
         if not isinstance(self.beat_matrix_corrected, np.ndarray):
             raise TypeError("beat_matrix_corrected must be a numpy array")
 
-        self.t_wave_vector = np.zeros((len(self.qrs), self.num_signals))
-        for i, beat in enumerate(self.beat_matrix_corrected):
-            self.t_wave_vector[i, :] = beat[int(0.2 * self.fs) : int(0.4 * self.fs)]
+        self.t_wave_vector = np.zeros((self.n_sig, len(self.qrs), int(0.3 * self.fs)))
+        for i in range(len(self.qrs)):
+            self.t_wave_vector[:, i, :] = self.beat_matrix_corrected[
+                :, i, int(0.3 * self.fs) : int(0.5 * self.fs)
+            ]
 
     def _calculate_k_score(self) -> None:
         """Calculate K-score (spectral method) from ECG signal."""
-        if self.num_signals is None:
-            raise ValueError("num_signals must be defined")
-        self.k_score = np.zeros(self.num_signals)
-        for i in range(self.num_signals):
+        if not isinstance(self.n_sig, int):
+            raise ValueError("n_sig must be defined")
+        if not isinstance(self.t_wave_vector, np.ndarray):
+            raise TypeError("t_wave_vector must be a numpy array")
+
+        # placeholder for K-score results
+        self.k_score = np.zeros(self.n_sig)
+
+        # calculate K-score for each signal
+        for i in range(self.n_sig):
             self.k_score[i] = np.std(self.t_wave_vector[:, i]) / np.mean(
                 self.t_wave_vector[:, i]
             )
