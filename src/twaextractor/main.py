@@ -177,7 +177,7 @@ class TWAExtractor(pydantic.BaseModel):
         if not isinstance(self.beat_matrix_corrected, np.ndarray):
             raise TypeError("beat_matrix_corrected must be a numpy array")
 
-        self.t_wave_vector = np.zeros((self.n_sig, len(self.qrs), int(0.3 * self.fs)))
+        self.t_wave_vector = np.zeros((self.n_sig, len(self.qrs), int(0.2 * self.fs)))
         for i in range(len(self.qrs)):
             self.t_wave_vector[:, i, :] = self.beat_matrix_corrected[
                 :, i, int(0.3 * self.fs) : int(0.5 * self.fs)
@@ -190,11 +190,38 @@ class TWAExtractor(pydantic.BaseModel):
         if not isinstance(self.t_wave_vector, np.ndarray):
             raise TypeError("t_wave_vector must be a numpy array")
 
-        # placeholder for K-score results
-        self.k_score = np.zeros(self.n_sig)
+        self.k_score = []
 
         # calculate K-score for each signal
-        for i in range(self.n_sig):
-            self.k_score[i] = np.std(self.t_wave_vector[:, i]) / np.mean(
-                self.t_wave_vector[:, i]
+        for chan in range(self.n_sig):
+            k_score = {}
+
+            temp = self.t_wave_vector[chan, :, :]
+            freqs = np.arange(temp.shape[1]) / temp.shape[1]
+            freqs = np.interp(
+                np.arange(0, temp.shape[1], temp.shape[1] / 512),
+                np.arange(temp.shape[1]),
+                freqs,
             )
+
+            k_score["tw_band"] = np.where((freqs > 0.495) & (freqs <= 0.5))[0]
+            k_score["noise_band"] = np.where((freqs > 0.43) & (freqs < 0.46))[0]
+
+            pw_fft = np.mean(np.abs(np.fft.fft(temp)) ** 2, axis=0)
+            pw_fft = np.interp(
+                np.arange(0, temp.shape[1], temp.shape[1] / 512),
+                np.arange(temp.shape[1]),
+                pw_fft,
+            )
+
+            k_score["twa_pw"] = np.mean(pw_fft[k_score["tw_band"]])
+            k_score["twa_mean_noise"] = np.mean(pw_fft[k_score["noise_band"]])
+            k_score["twa_std_noise"] = np.std(pw_fft[k_score["noise_band"]])
+            k_score["twa_voltage"] = np.emath.sqrt(
+                k_score["twa_pw"] - k_score["twa_mean_noise"]
+            ).real
+            k_score["k_score"] = (
+                k_score["twa_pw"] - k_score["twa_mean_noise"]
+            ) / k_score["twa_std_noise"]
+
+            self.k_score.append(k_score)
