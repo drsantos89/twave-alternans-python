@@ -2,9 +2,11 @@
 import logging
 from typing import Any
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pydantic
 import wfdb
+from scipy import signal
 from scipy.signal import butter, sosfiltfilt
 from wfdb import processing
 
@@ -21,6 +23,7 @@ class TWAExtractor(pydantic.BaseModel):
     """
 
     path: str
+    do_figures: bool = False
     signal_raw: np.ndarray[Any, Any] | None = None
     fs: int | None = None
     n_sig: int | None = None
@@ -35,7 +38,8 @@ class TWAExtractor(pydantic.BaseModel):
     beat_median_even: np.ndarray[Any, Any] | None = None
     beat_corrected_bool: np.ndarray[Any, Any] | None = None
     t_wave_vector: np.ndarray[Any, Any] | None = None
-    k_score: np.ndarray[Any, Any] | None = None
+    detrend: str = "constant"
+    k_score: list[dict[str, Any]] | None = None
 
     class Config:
         """Pydantic config class."""
@@ -97,9 +101,25 @@ class TWAExtractor(pydantic.BaseModel):
 
     def _detect_beats(self) -> None:
         """Detect beats in ECG signal."""
+        if not isinstance(self.fs, int):
+            raise TypeError("fs must be an integer")
         if not isinstance(self.signal_filt, np.ndarray):
             raise TypeError("signal_filt must be a numpy array")
-        self.qrs = processing.gqrs_detect(sig=self.signal_filt[0, :], fs=self.fs)
+
+        qrs_inds = processing.gqrs_detect(sig=self.signal_filt[0, :], fs=self.fs)
+        self.qrs = processing.correct_peaks(
+            sig=self.signal_filt[0, :],
+            peak_inds=qrs_inds,
+            search_radius=int(0.1 * self.fs),
+            smooth_window_size=int(0.05 * self.fs),
+        )
+
+        if self.do_figures:
+            plt.figure()
+            plt.plot(self.signal_filt[0, :])
+            plt.plot(qrs_inds, self.signal_filt[0, qrs_inds], "gx")
+            plt.plot(self.qrs, self.signal_filt[0, self.qrs], "ro")
+            plt.show()
 
     def _build_beat_matrix(self) -> None:
         """Build beat matrix from ECG signal."""
@@ -177,11 +197,21 @@ class TWAExtractor(pydantic.BaseModel):
         if not isinstance(self.beat_matrix_corrected, np.ndarray):
             raise TypeError("beat_matrix_corrected must be a numpy array")
 
-        self.t_wave_vector = np.zeros((self.n_sig, len(self.qrs), int(0.2 * self.fs)))
+        self.t_wave_vector = np.zeros((self.n_sig, len(self.qrs), int(0.3 * self.fs)))
         for i in range(len(self.qrs)):
             self.t_wave_vector[:, i, :] = self.beat_matrix_corrected[
-                :, i, int(0.3 * self.fs) : int(0.5 * self.fs)
+                :, i, int(0.2 * self.fs) : int(0.5 * self.fs)
             ]
+
+        if self.do_figures:
+            plt.figure()
+            plt.plot(self.beat_matrix_corrected[0, :, :].T, "k")
+            plt.plot(
+                np.arange(int(0.2 * self.fs), int(0.5 * self.fs)),
+                self.t_wave_vector[0, :, :].T,
+                "r",
+            )
+            plt.show()
 
     def _calculate_k_score(self) -> None:
         """Calculate K-score (spectral method) from ECG signal."""
@@ -197,6 +227,12 @@ class TWAExtractor(pydantic.BaseModel):
             k_score = {}
 
             temp = self.t_wave_vector[chan, :, :]
+
+            if self.detrend == "constant":
+                temp = signal.detrend(temp, axis=0, type="constant")
+            elif self.detrend == "diff":
+                temp = np.diff(temp, axis=0)
+
             freqs = np.arange(temp.shape[1]) / temp.shape[1]
             freqs = np.interp(
                 np.arange(0, temp.shape[1], temp.shape[1] / 512),
